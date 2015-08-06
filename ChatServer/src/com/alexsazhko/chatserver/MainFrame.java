@@ -1,7 +1,6 @@
 package com.alexsazhko.chatserver;
 
 import java.awt.Container;
-import java.awt.Dialog;
 import java.awt.FlowLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -15,7 +14,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
@@ -28,11 +26,9 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	private static final long serialVersionUID = 1L;
 	private int port = 6060;
 	private JTextArea chatView;
-	private JTextArea chatWriteField;
 	private JMenuBar menuBar;
 	private JMenu file;
 	private JMenuItem setPort;
-	private JButton buttonSend;
 	
 	private ServerSocket serverSocket = null;
 	private List<ClientConnection> clientsThread = new ArrayList<ClientConnection>();
@@ -53,8 +49,6 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	    contentPane.setLayout(new FlowLayout());
 	    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		chatView = new JTextArea(20, 46);
-		chatWriteField = new JTextArea(5, 40);
-		buttonSend = new JButton("Send");
 		menuBar = new JMenuBar();
 		file = new JMenu("File");
 		setPort = new JMenuItem("SetPort");
@@ -63,8 +57,6 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		file.add(setPort);
 		setJMenuBar(menuBar);
 		contentPane.add(chatView);
-		contentPane.add(chatWriteField);
-		contentPane.add(buttonSend);
 		
 		setVisible(true);
 		
@@ -96,7 +88,7 @@ public class MainFrame extends JFrame implements CallBackMessage{
 				serverSocket = new ServerSocket(port);
 		        System.out.println("Server started. Listening to the port" + port + ". Waitng for the client.");				        				       
 		    } catch (IOException e) {
-		        System.out.println("Could not listen on port:" + port);
+		        System.out.println("Could not listen on port: " + port);
 		        e.printStackTrace();
 		        return;
 		    }
@@ -118,15 +110,6 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		clientConnection = new ClientConnection(clientSocket, clientsThread);
 		clientConnection.registerCallBack(this);
 		clientsThread.add(clientConnection);
-
-		buttonSend.addActionListener(new ActionListener() {
-			
-			public void actionPerformed(ActionEvent arg0) {
-				String message = chatWriteField.getText();
-				message = "server: " + message;
-				chatView.setText(message);
-			}
-		});
 		
 		threadPool.submit(clientConnection);		
 	}
