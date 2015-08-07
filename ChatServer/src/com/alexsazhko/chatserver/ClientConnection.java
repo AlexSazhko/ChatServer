@@ -32,14 +32,15 @@ public class ClientConnection implements Runnable{
             dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
     		while (isConnected) {
 	            if(dataInputStream != null && dataInputStream.available() > 0){
+	            	
 	    			String stringMessage = dataInputStream.readUTF();
 	    			chatMessage = getChatMessage(stringMessage);
-	    			
+	    			System.out.println("own" + chatMessage.isOwnMessage());
 	    			if (chatMessage != null && chatMessage.getMessageFlag().equals("END")){
 	    				clientsThread.remove(this);
 	    				break;
 	    			}
-		        
+
 		            callBackMessage.setText(chatMessage.getUserName() + ": " + chatMessage.getMsgContent() + "\n");
 	            	for(ClientConnection client: clientsThread){
 	            		if(client != this){
