@@ -16,12 +16,15 @@ public class ClientConnection implements Runnable{
 	private DataInputStream dataInputStream = null;
 	private DataOutputStream dataOutputStream = null;
 	private List<ClientConnection> clientsThread;
+	private ClientConnection toClient;
+	private String userName;
+	private String toUserName;
 
-	public ClientConnection(Socket clientSocket,
-			List<ClientConnection> clientsThread) {
+	public ClientConnection(Socket clientSocket, List<ClientConnection> clientsThread){
 		this.clientSocket = clientSocket;
 		this.clientsThread = clientsThread;
 		isConnected = true;
+		toClient = null;
 	}
 
 	public void run() {
@@ -30,25 +33,56 @@ public class ClientConnection implements Runnable{
 		try {
             dataInputStream = new DataInputStream(clientSocket.getInputStream());
             dataOutputStream = new DataOutputStream(clientSocket.getOutputStream());
+
     		while (isConnected) {
 	            if(dataInputStream != null && dataInputStream.available() > 0){
-	            	
 	    			String stringMessage = dataInputStream.readUTF();
 	    			chatMessage = getChatMessage(stringMessage);
-	    			System.out.println("own" + chatMessage.isOwnMessage());
-	    			if (chatMessage != null && chatMessage.getMessageFlag().equals("END")){
-	    				clientsThread.remove(this);
-	    				break;
+	    			MessageState state = MessageState.valueOf(chatMessage.getMessageFlag());
+	    			
+	    			switch(state){
+	    				case NEW:  	
+	    					synchronized (clientsThread) {
+		    					clientsThread.add(this);
+		    				}
+		    				System.out.println(clientsThread.size());
+		    				userName = chatMessage.getUserName();
+		    				toUserName = chatMessage.getToUserName();
+		    				callBackMessage.setText("User " + userName + " joined to the chat" + "\n");
+		    				break;
+	    				case MESSAGE:
+	    					callBackMessage.setText(userName + " to " + toUserName + chatMessage.getMsgContent() + "\n");
+		    				System.out.println("toUser " + toUserName);
+		    				if(toClient == null) {
+			    			    synchronized (clientsThread) {
+			    			    	toClient = getToClient(toUserName);
+			    			    }
+			    				toClient.dataOutputStream.writeUTF(stringMessage);
+		    					toClient.dataOutputStream.flush(); 
+		    				}
+		    				else{	
+		    					toClient.dataOutputStream.writeUTF(stringMessage);
+		    					toClient.dataOutputStream.flush();    			
+		    				}
+		    				System.out.println("message: " + chatMessage.getMsgContent() +  " sended to " + toClient.userName);
+		    				break;
+	    				case END:
+	    					synchronized (clientsThread) {
+		    					clientsThread.remove(this);
+		    				}
+		    				System.out.println(clientsThread.size());
+		    				toClient.toClientDisconnected();
+		    				callBackMessage.setText("User " + chatMessage.getUserName() + " leave the chat" + "\n");
+		    				isConnected = false;
+		    				break;
+	    				    				
 	    			}
-
-		            callBackMessage.setText(chatMessage.getUserName() + ": " + chatMessage.getMsgContent() + "\n");
-	            	for(ClientConnection client: clientsThread){
-	            		if(client != this){
-	            			client.dataOutputStream.writeUTF(stringMessage);
-	            			client.dataOutputStream.flush();
-	            		}
-                    }
 	            }
+	            try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {						
+					e.printStackTrace();
+				}
 	    	}
    
             
@@ -92,6 +126,26 @@ public class ClientConnection implements Runnable{
         Gson gson = new Gson();
         ChatMessage message = gson.fromJson(json, ChatMessage.class);
         return message;
+    }
+    
+    private ClientConnection getToClient(String toUserName){
+
+        	for(ClientConnection client: clientsThread){
+        		if(client.getUserName().equals(toUserName)){
+        			System.out.println("find toUser " + client.userName);
+        			return client;
+        		}
+        	}
+        	return null;
+		
+    }
+    
+    public String getUserName(){
+    	return userName;
+    }
+    
+    public void toClientDisconnected(){
+    	toClient = null;
     }
 	
     public void disconnect(){

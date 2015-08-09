@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -31,7 +33,7 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	private JMenuItem setPort;
 	
 	private ServerSocket serverSocket = null;
-	private List<ClientConnection> clientsThread = new ArrayList<ClientConnection>();
+	private List<ClientConnection> clientsThread = Collections.synchronizedList(new ArrayList<ClientConnection>());
     private ClientConnection clientConnection;
     
     private ExecutorService threadPool;
@@ -63,7 +65,7 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	}
 
 	private void initConectionThread() {
-		threadPool = Executors.newFixedThreadPool(3);
+		threadPool = Executors.newCachedThreadPool();
 		threadPool.execute(new ServerThread());		
 	}
 	
@@ -101,6 +103,11 @@ public class MainFrame extends JFrame implements CallBackMessage{
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {						
+					e.printStackTrace();
+				}
 			}
 		}
 	}
@@ -109,7 +116,7 @@ public class MainFrame extends JFrame implements CallBackMessage{
 
 		clientConnection = new ClientConnection(clientSocket, clientsThread);
 		clientConnection.registerCallBack(this);
-		clientsThread.add(clientConnection);
+		//clientsThread.add(clientConnection);
 		
 		threadPool.submit(clientConnection);		
 	}
