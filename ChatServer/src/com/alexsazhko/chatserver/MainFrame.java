@@ -9,8 +9,8 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -37,6 +37,9 @@ public class MainFrame extends JFrame implements CallBackMessage{
     private ClientConnection clientConnection;
     
     private ExecutorService threadPool;
+    private ExecutorService threadPoolServer;
+    
+    private boolean isConnected;
 	
 
 	public MainFrame() {		
@@ -65,8 +68,10 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	}
 
 	private void initConectionThread() {
+		isConnected = true;
 		threadPool = Executors.newCachedThreadPool();
-		threadPool.execute(new ServerThread());		
+		threadPoolServer = Executors.newSingleThreadExecutor();
+		threadPoolServer.execute(new ServerThread());
 	}
 	
 	public void setText(String message) {
@@ -94,20 +99,34 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		        e.printStackTrace();
 		        return;
 		    }
-			while (true) {				
-				try {						
-					Socket clientSocket = serverSocket.accept();						
-			        System.out.println("Client connected on port" + port);
-			        initClientConnection(clientSocket);
-			        setWinodwCloseListnerToCloseSocket(clientSocket);
+			try{
+				while (isConnected) {	
+					try {
+						Socket clientSocket = serverSocket.accept();
+				        System.out.println("Client connected on port" + port);
+				        initClientConnection(clientSocket);
+				        setWinodwCloseListnerToCloseSocket(clientSocket);
+					}catch (SocketTimeoutException e) {
+                        continue;
+					}catch (IOException e) {
+						e.printStackTrace();
+					}
+					try {
+						Thread.sleep(100);
+					} catch (InterruptedException e) {						
+						e.printStackTrace();
+					}
+
+				}				
+			}finally{
+				try {
+					if (serverSocket != null) {
+						serverSocket.close();
+					}
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-				try {
-					Thread.sleep(100);
-				} catch (InterruptedException e) {						
-					e.printStackTrace();
-				}
+
 			}
 		}
 	}
@@ -121,11 +140,20 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		threadPool.submit(clientConnection);		
 	}
 	
+	private void stopClientSocket(){
+		synchronized (clientsThread) {
+    		for(ClientConnection clientConnection: clientsThread)
+                clientConnection.disconnect();
+		}
+		threadPoolServer.shutdown();
+		threadPool.shutdown();
+		System.out.println("ShoutDown");
+	}
+	
 	private void setWinodwCloseListnerToCloseSocket(final Socket clientSocket) {
         addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent e) {
-                clientConnection.disconnect();
-                threadPool.shutdown();
+            public void windowClosing(WindowEvent e) {   
+                stopClientSocket();
             }
         });
     }

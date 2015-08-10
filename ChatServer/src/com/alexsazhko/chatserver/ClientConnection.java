@@ -113,7 +113,7 @@ public class ClientConnection implements Runnable{
                     e.printStackTrace();
                     }
                 }
-            } //End of fi
+            } //End of finally
 		
 	}
     
