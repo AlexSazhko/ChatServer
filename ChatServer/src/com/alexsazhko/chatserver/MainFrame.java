@@ -6,6 +6,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
+import java.io.Closeable;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -15,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.swing.JFrame;
 import javax.swing.JMenu;
@@ -31,20 +33,22 @@ public class MainFrame extends JFrame implements CallBackMessage{
 	private JMenuBar menuBar;
 	private JMenu file;
 	private JMenuItem setPort;
+	private JMenuItem stop;
 	
 	private ServerSocket serverSocket = null;
 	private List<ClientConnection> clientsThread = Collections.synchronizedList(new ArrayList<ClientConnection>());
     private ClientConnection clientConnection;
-    
+
     private ExecutorService threadPool;
     private ExecutorService threadPoolServer;
     
-    private boolean isConnected;
-	
+    private volatile boolean isConnected;
+	private ServerThread serverThread;
 
 	public MainFrame() {		
 		initComponent();
 		initConectionThread();
+
 	}
 
 	private void initComponent() {
@@ -58,11 +62,14 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		file = new JMenu("File");
 		setPort = new JMenuItem("SetPort");
 		setPort.addActionListener(new menuListener());
+		stop = new JMenuItem("Stop");
+		stop.addActionListener(new serverListener());
 		menuBar.add(file);
 		file.add(setPort);
+		file.add(stop);
 		setJMenuBar(menuBar);
 		contentPane.add(chatView);
-		
+		setWinodwCloseListnerToCloseSocket();
 		setVisible(true);
 		
 	}
@@ -71,7 +78,8 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		isConnected = true;
 		threadPool = Executors.newCachedThreadPool();
 		threadPoolServer = Executors.newSingleThreadExecutor();
-		threadPoolServer.execute(new ServerThread());
+		serverThread = new ServerThread();
+		threadPoolServer.execute(serverThread);
 	}
 	
 	public void setText(String message) {
@@ -80,9 +88,16 @@ public class MainFrame extends JFrame implements CallBackMessage{
 
 	
 	private class menuListener implements ActionListener{
-		public void actionPerformed(ActionEvent arg0) {
+		public void actionPerformed(ActionEvent arg) {
 			port = Integer.parseInt(JOptionPane.showInputDialog(MainFrame.this, "Set port"));
 			chatView.append("Setted port: " + port);			
+		}
+		
+	}
+	
+	private class serverListener implements ActionListener{
+		public void actionPerformed(ActionEvent arg) {
+			isConnected = false;	
 		}
 		
 	}
@@ -104,25 +119,26 @@ public class MainFrame extends JFrame implements CallBackMessage{
 					try {
 						Socket clientSocket = serverSocket.accept();
 				        System.out.println("Client connected on port" + port);
-				        initClientConnection(clientSocket);
-				        setWinodwCloseListnerToCloseSocket(clientSocket);
-					}catch (SocketTimeoutException e) {
-                        continue;
+				        initClientConnection(clientSocket);			        
 					}catch (IOException e) {
 						e.printStackTrace();
 					}
-					try {
+					/*try {
 						Thread.sleep(100);
 					} catch (InterruptedException e) {						
 						e.printStackTrace();
-					}
-
+					}*/
+					TimeUnit.MILLISECONDS.sleep(100);
 				}				
+			}
+			catch (InterruptedException e) {				
+				e.printStackTrace();
 			}finally{
 				try {
 					if (serverSocket != null) {
 						serverSocket.close();
 					}
+					stopClientSocket();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -150,11 +166,13 @@ public class MainFrame extends JFrame implements CallBackMessage{
 		System.out.println("ShoutDown");
 	}
 	
-	private void setWinodwCloseListnerToCloseSocket(final Socket clientSocket) {
+	private void setWinodwCloseListnerToCloseSocket() {
         addWindowListener(new WindowAdapter() {
-            public void windowClosing(WindowEvent e) {   
+            public void windowClosing(WindowEvent e) {  
+
                 stopClientSocket();
             }
         });
     }
+
 }
