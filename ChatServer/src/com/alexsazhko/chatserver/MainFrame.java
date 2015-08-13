@@ -123,16 +123,16 @@ public class MainFrame extends JFrame implements CallBackMessage{
 					}catch (IOException e) {
 						e.printStackTrace();
 					}
-					/*try {
+					try {
 						Thread.sleep(100);
 					} catch (InterruptedException e) {						
 						e.printStackTrace();
-					}*/
-					TimeUnit.MILLISECONDS.sleep(100);
+					}
+					//TimeUnit.MILLISECONDS.sleep(100);
 				}				
-			}
+			/*}
 			catch (InterruptedException e) {				
-				e.printStackTrace();
+				e.printStackTrace();*/
 			}finally{
 				try {
 					if (serverSocket != null) {
