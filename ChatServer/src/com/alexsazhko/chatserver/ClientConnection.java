@@ -4,7 +4,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.List;
+import org.json.*;
 
 import com.google.gson.Gson;
 
@@ -19,6 +21,7 @@ public class ClientConnection implements Runnable{
 	private ClientConnection toClient;
 	private String userName;
 	private String toUserName;
+	private Contact contact;
 
 	public ClientConnection(Socket clientSocket, List<ClientConnection> clientsThread){
 		this.clientSocket = clientSocket;
@@ -37,38 +40,43 @@ public class ClientConnection implements Runnable{
     		while (isConnected) {
 	            if(dataInputStream != null && dataInputStream.available() > 0){
 	    			String stringMessage = dataInputStream.readUTF();
-	    			chatMessage = getChatMessage(stringMessage);
-	    			MessageState state = MessageState.valueOf(chatMessage.getMessageFlag());
+	    			
+	    			MessageState state = getMessageFlag(stringMessage);
 	    			
 	    			switch(state){
-	    			case SEARCH:  	
-	    				System.out.println("find User " + chatMessage.getMsgContent());
+	    			case SEARCH:  
+	    				ContactList contactList = new ContactList();
+	    				ArrayList<Contact> contacts = new  ArrayList<Contact>();	    				
+	    				chatMessage = getChatMessage(stringMessage);
+	    				
     					synchronized (clientsThread) {
-    						String findedName = "";
-    						for(ClientConnection findedclient: clientsThread){
-    							if(findedclient.userName.equalsIgnoreCase(chatMessage.getMsgContent())){
-    								findedName = findedclient.userName;
+
+    						for(ClientConnection findedContact: clientsThread){
+    							if(findedContact.contact.getName().equalsIgnoreCase(chatMessage.getMsgContent())){   								   								
+    								contacts.add(findedContact.contact);
     							}
-    						}			
-    						dataOutputStream.writeUTF(setMessageToSend(composeMessage(MessageState.SEARCH, findedName)));
+    						}
+    						contactList.setClients(contacts);
+    						dataOutputStream.writeUTF(setContactListToSend(contactList));
 	    					dataOutputStream.flush();
 	    				
 	    				}
 	  
 	    				break;
-	    				case NEW:  	
+	    				case NEW:  
+	    					contact = getContact(stringMessage);
+		    				userName = contact.getName();
 	    					synchronized (clientsThread) {
 		    					clientsThread.add(this);
 		    				}
-		    				System.out.println(clientsThread.size());
-		    				userName = chatMessage.getUserName();
-		    				
-		    				callBackMessage.setText("User " + userName + " joined to the chat" + "\n");
+	    					
+		    				System.out.println(clientsThread.size());			
+		    				callBackMessage.setText("User " + contact.getName() + " joined to the chat" + "\n");
 		    				break;
 	    				case MESSAGE:
+	    					chatMessage = getChatMessage(stringMessage);
 	    					toUserName = chatMessage.getToUserName();
 	    					callBackMessage.setText(userName + " to " + toUserName + chatMessage.getMsgContent() + "\n");
-		    				System.out.println("toUser " + toUserName);
 		    				if(toClient == null) {
 			    			    synchronized (clientsThread) {
 			    			    	toClient = getToClient(toUserName);
@@ -80,9 +88,9 @@ public class ClientConnection implements Runnable{
 		    					toClient.dataOutputStream.writeUTF(stringMessage);
 		    					toClient.dataOutputStream.flush();    			
 		    				}
-		    				System.out.println("message: " + chatMessage.getMsgContent() +  " sended to " + toClient.userName);
 		    				break;
 	    				case END:
+	    					chatMessage = getChatMessage(stringMessage);
 	    					callBackMessage.setText("User " + chatMessage.getUserName() + " leave the chat" + "\n");
 	    					synchronized (clientsThread) {
 		    					clientsThread.remove(this);
@@ -147,13 +155,13 @@ public class ClientConnection implements Runnable{
     
     private ClientConnection getToClient(String toUserName){
 
-        	for(ClientConnection client: clientsThread){
-        		if(client.getUserName().equals(toUserName)){
-        			System.out.println("find toUser " + client.userName);
-        			return client;
-        		}
-        	}
-        	return null;
+    	for(ClientConnection client: clientsThread){
+    		if(client.getUserName().equals(toUserName)){
+    			System.out.println("find toUser " + client.userName);
+    			return client;
+    		}
+    	}
+    	return null;
 		
     }
     
@@ -169,20 +177,36 @@ public class ClientConnection implements Runnable{
     	isConnected = false;
     }
     
-    private ChatMessage composeMessage(MessageState messageState, String name){
-        ChatMessage chatMsg = new ChatMessage();
-
-        chatMsg.setMsgContent(name);
-        chatMsg.setMessageFlag(messageState.name());
-        chatMsg.setOwnMessage(true);
-
-        return chatMsg;
-    }
-    
     public String setMessageToSend(ChatMessage msg){
         Gson gson = new Gson();
         String jsonMessage = gson.toJson(msg);
         return jsonMessage;
     }
+    
+    private Contact getContact(String message){
+        Gson gson = new Gson();
+        ContactNew contactNew = gson.fromJson(message, ContactNew.class);
+        Contact contact = contactNew.getContact();;
+    	return contact;
+    }
+    
+    private MessageState getMessageFlag(String json){
+    	MessageState messageFlag = MessageState.MESSAGE;
+    	
+    	try {
+            JSONObject jsonObject = new JSONObject(json);                     
+            messageFlag = MessageState.valueOf(jsonObject.getString("messageFlag"));      
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    	return messageFlag;
+    }
+    
+    public String setContactListToSend(ContactList contactList){
+        Gson gson = new Gson();
+        String jsonMessage = gson.toJson(contactList);
+        return jsonMessage;
+    }
+    
 
 }
